@@ -1,74 +1,47 @@
-import { GoogleGenAI } from "@google/genai";
-
-const getAiClient = () => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-        throw new Error("API Key is missing");
-    }
-    return new GoogleGenAI({ apiKey });
-};
 
 /**
- * Uses Gemini to improve the markdown formatting, specifically focusing on fixing
- * LaTeX math equations and standardizing structure.
+ * Calls the Vercel serverless function to perform AI operations.
+ */
+async function callAiApi(action: 'enhance' | 'generate' | 'edit', text: string, prompt?: string): Promise<string> {
+    try {
+        const response = await fetch('/api/ai', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action, text, prompt }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `API request failed with status ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.result;
+    } catch (error) {
+        console.error(`AI Service Error (${action}):`, error);
+        throw error;
+    }
+}
+
+/**
+ * Uses Gemini to improve the markdown formatting.
  */
 export const enhanceMarkdown = async (text: string): Promise<string> => {
-    const ai = getAiClient();
-    
-    // Using flash for speed on text formatting tasks
-    const model = 'gemini-2.5-flash';
-
-    const prompt = `
-    You are an expert Markdown and LaTeX editor. 
-    Review the following markdown text. 
-    1. Correct any malformed LaTeX equations (ensure proper use of $ for inline and $$ for block).
-    2. Ensure the LaTeX syntax is compatible with KaTeX.
-    3. Fix major grammar or spelling errors but keep the tone and content identical.
-    4. Improve table formatting if present.
-    5. Return ONLY the corrected markdown. Do not add conversational text.
-
-    Here is the text:
-    ${text}
-    `;
-
-    try {
-        const response = await ai.models.generateContent({
-            model: model,
-            contents: prompt,
-        });
-        
-        return response.text.trim();
-    } catch (error) {
-        console.error("Gemini Enhancement Error:", error);
-        throw error;
-    }
+    return callAiApi('enhance', text);
 };
 
 /**
- * Generate a new section or continue text based on a prompt
+ * Generate a new section or continue text based on a prompt.
  */
 export const generateContent = async (prompt: string, currentContext: string): Promise<string> => {
-    const ai = getAiClient();
-    const model = 'gemini-2.5-flash';
+    return callAiApi('generate', currentContext, prompt);
+};
 
-    const fullPrompt = `
-    Context:
-    ${currentContext.slice(-1000)} 
-    
-    User Request: ${prompt}
-    
-    Generate markdown content to fulfill the request. If it involves math, use LaTeX format (e.g., $E=mc^2$).
-    Return only the generated content.
-    `;
-
-    try {
-        const response = await ai.models.generateContent({
-            model: model,
-            contents: fullPrompt,
-        });
-        return response.text.trim();
-    } catch (error) {
-        console.error("Gemini Generation Error:", error);
-        throw error;
-    }
+/**
+ * Edit the existing content based on a prompt.
+ */
+export const editMarkdown = async (prompt: string, currentContent: string): Promise<string> => {
+    return callAiApi('edit', currentContent, prompt);
 };

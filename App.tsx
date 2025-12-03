@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { MarkdownPreview } from './components/MarkdownPreview';
 import { Button } from './components/Button';
-import { enhanceMarkdown, generateContent } from './services/geminiService';
+import { enhanceMarkdown, generateContent, editMarkdown } from './services/geminiService';
 import { 
   Download, 
   Wand2, 
@@ -98,7 +98,23 @@ const App: React.FC = () => {
       setPromptText("");
       setShowPromptInput(false);
     } catch (err) {
-      alert("Failed to generate content.");
+      alert("Failed to generate content. Ensure GEMINI_API_KEY is set.");
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!promptText.trim()) return;
+
+    setIsAiLoading(true);
+    try {
+      const edited = await editMarkdown(promptText, markdown);
+      setMarkdown(edited);
+      setPromptText("");
+      setShowPromptInput(false);
+    } catch (err) {
+      alert("Failed to edit content. Ensure GEMINI_API_KEY is set.");
     } finally {
       setIsAiLoading(false);
     }
@@ -204,8 +220,11 @@ const App: React.FC = () => {
                                         }
                                     }}
                                 />
-                                <div className="flex justify-end mt-2">
-                                    <Button size="sm" onClick={handleGenerate} disabled={!promptText.trim() || isAiLoading}>
+                                <div className="flex justify-end gap-2 mt-2">
+                                    <Button variant="ghost" size="sm" onClick={handleEdit} disabled={!promptText.trim() || isAiLoading} title="Replaces content based on instruction">
+                                        Edit
+                                    </Button>
+                                    <Button size="sm" onClick={handleGenerate} disabled={!promptText.trim() || isAiLoading} title="Appends new content">
                                         Generate
                                     </Button>
                                 </div>
